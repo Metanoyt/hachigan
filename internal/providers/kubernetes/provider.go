@@ -12,4 +12,13 @@ type Provider interface {
 	Workloads(ctx context.Context) ([]domain.Workload, error)
 	Services(ctx context.Context) ([]domain.Service, error)
 	Applications(ctx context.Context) ([]domain.Application, error)
+	Snapshot(ctx context.Context) (Snapshot, error)
+}
+
+type Snapshot struct {
+	Summary    domain.ClusterSummary
+	Namespaces []string
+	Workloads  []domain.Workload
+	Services   []domain.Service
+	Apps       []domain.Application
 }

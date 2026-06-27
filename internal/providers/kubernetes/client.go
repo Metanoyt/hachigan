@@ -38,6 +38,8 @@ func New(cfg config.Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build kubernetes config: %w", err)
 	}
+	restConfig.QPS = 50
+	restConfig.Burst = 100
 	rawConfig, err := clientConfig.RawConfig()
 	if err != nil {
 		return nil, fmt.Errorf("read kubeconfig: %w", err)
@@ -58,24 +60,51 @@ func New(cfg config.Config) (*Client, error) {
 }
 
 func (c *Client) ClusterSummary(ctx context.Context) (domain.ClusterSummary, error) {
+	snapshot, err := c.Snapshot(ctx)
+	if err != nil {
+		return domain.ClusterSummary{}, err
+	}
+	return snapshot.Summary, nil
+}
+
+func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	namespaces, err := c.Namespaces(ctx)
 	if err != nil {
-		return domain.ClusterSummary{}, err
+		return Snapshot{}, err
 	}
-	workloads, err := c.Workloads(ctx)
+	workloads, err := c.workloadsForNamespaces(ctx, namespaces)
 	if err != nil {
-		return domain.ClusterSummary{}, err
+		return Snapshot{}, err
 	}
-	services, err := c.Services(ctx)
+	services, err := c.servicesForNamespaces(ctx, namespaces)
 	if err != nil {
-		return domain.ClusterSummary{}, err
+		return Snapshot{}, err
 	}
+	apps, err := c.applicationsForNamespaces(ctx, namespaces)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{
+		Summary: domain.ClusterSummary{
+			ContextName:    c.contextName,
+			NamespaceCount: len(namespaces),
+			WorkloadCount:  len(workloads),
+			ServiceCount:   len(services),
+		},
+		Namespaces: namespaces,
+		Workloads:  workloads,
+		Services:   services,
+		Apps:       apps,
+	}, nil
+}
+
+func (c *Client) summary(namespaces []string, workloads []domain.Workload, services []domain.Service) domain.ClusterSummary {
 	return domain.ClusterSummary{
 		ContextName:    c.contextName,
 		NamespaceCount: len(namespaces),
 		WorkloadCount:  len(workloads),
 		ServiceCount:   len(services),
-	}, nil
+	}
 }
 
 func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
@@ -94,11 +123,15 @@ func (c *Client) Namespaces(ctx context.Context) ([]string, error) {
 }
 
 func (c *Client) Workloads(ctx context.Context) ([]domain.Workload, error) {
-	var out []domain.Workload
 	namespaces, err := c.Namespaces(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return c.workloadsForNamespaces(ctx, namespaces)
+}
+
+func (c *Client) workloadsForNamespaces(ctx context.Context, namespaces []string) ([]domain.Workload, error) {
+	var out []domain.Workload
 	for _, namespace := range namespaces {
 		deployments, err := c.clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -137,11 +170,15 @@ func (c *Client) Workloads(ctx context.Context) ([]domain.Workload, error) {
 }
 
 func (c *Client) Services(ctx context.Context) ([]domain.Service, error) {
-	var out []domain.Service
 	namespaces, err := c.Namespaces(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return c.servicesForNamespaces(ctx, namespaces)
+}
+
+func (c *Client) servicesForNamespaces(ctx context.Context, namespaces []string) ([]domain.Service, error) {
+	var out []domain.Service
 	for _, namespace := range namespaces {
 		services, err := c.clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -164,11 +201,15 @@ func (c *Client) Services(ctx context.Context) ([]domain.Service, error) {
 }
 
 func (c *Client) Applications(ctx context.Context) ([]domain.Application, error) {
-	grouped := map[string]*domain.Application{}
 	namespaces, err := c.Namespaces(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return c.applicationsForNamespaces(ctx, namespaces)
+}
+
+func (c *Client) applicationsForNamespaces(ctx context.Context, namespaces []string) ([]domain.Application, error) {
+	grouped := map[string]*domain.Application{}
 	for _, namespace := range namespaces {
 		deployments, err := c.clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {

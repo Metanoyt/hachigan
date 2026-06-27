@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hachigan/hachigan/internal/domain"
+	"github.com/hachigan/hachigan/internal/providers/kubernetes"
 )
 
 type fakeProvider struct{}
@@ -30,6 +31,14 @@ func (fakeProvider) Applications(context.Context) ([]domain.Application, error) 
 		Workloads: []domain.WorkloadRef{{Name: "api", Namespace: "default", Kind: "Deployment"}},
 		Services:  []domain.ServiceRef{{Name: "api", Namespace: "default"}},
 	}}, nil
+}
+func (f fakeProvider) Snapshot(ctx context.Context) (kubernetes.Snapshot, error) {
+	summary, _ := f.ClusterSummary(ctx)
+	namespaces, _ := f.Namespaces(ctx)
+	workloads, _ := f.Workloads(ctx)
+	services, _ := f.Services(ctx)
+	apps, _ := f.Applications(ctx)
+	return kubernetes.Snapshot{Summary: summary, Namespaces: namespaces, Workloads: workloads, Services: services, Apps: apps}, nil
 }
 
 func TestOverviewIncludesProblematicWorkloads(t *testing.T) {

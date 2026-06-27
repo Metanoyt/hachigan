@@ -45,6 +45,7 @@ func Load(path string) (Config, error) {
 		}
 		cfg.RefreshInterval = duration
 	}
+	//TODO: Evaluate if RefreshInterval should have limits or constraints, if so implement validation logic
 	if cfg.RefreshInterval == 0 {
 		cfg.RefreshInterval = Default().RefreshInterval
 	}

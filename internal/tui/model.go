@@ -121,16 +121,7 @@ func (m Model) View() string {
 }
 
 func (m Model) loadData() tea.Msg {
-	ctx := context.Background()
-	overview, err := m.orchestrator.Overview(ctx)
-	if err != nil {
-		return errMsg{err: err}
-	}
-	apps, err := m.orchestrator.Applications(ctx)
-	if err != nil {
-		return errMsg{err: err}
-	}
-	cluster, err := m.orchestrator.ClusterInventory(ctx)
+	overview, apps, cluster, err := m.orchestrator.Dashboard(context.Background())
 	if err != nil {
 		return errMsg{err: err}
 	}

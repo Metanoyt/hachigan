@@ -17,24 +17,11 @@ func New(provider kubernetes.Provider) Orchestrator {
 }
 
 func (o Orchestrator) Overview(ctx context.Context) (OverviewView, error) {
-	summary, err := o.provider.ClusterSummary(ctx)
+	snapshot, err := o.provider.Snapshot(ctx)
 	if err != nil {
 		return OverviewView{}, err
 	}
-	workloads, err := o.provider.Workloads(ctx)
-	if err != nil {
-		return OverviewView{}, err
-	}
-	problematic := make([]domain.Workload, 0)
-	for _, workload := range workloads {
-		if workload.Health == domain.HealthWarning || workload.Health == domain.HealthCritical {
-			problematic = append(problematic, workload)
-		}
-		if len(problematic) == 5 {
-			break
-		}
-	}
-	return OverviewView{Summary: summary, ProblematicWorkloads: problematic}, nil
+	return OverviewView{Summary: snapshot.Summary, ProblematicWorkloads: problematicWorkloads(snapshot.Workloads)}, nil
 }
 
 func (o Orchestrator) Applications(ctx context.Context) (ApplicationsView, error) {
@@ -72,19 +59,35 @@ func (o Orchestrator) ApplicationDetail(ctx context.Context, namespace, name str
 }
 
 func (o Orchestrator) ClusterInventory(ctx context.Context) (ClusterInventoryView, error) {
-	namespaces, err := o.provider.Namespaces(ctx)
+	snapshot, err := o.provider.Snapshot(ctx)
 	if err != nil {
 		return ClusterInventoryView{}, err
 	}
-	workloads, err := o.provider.Workloads(ctx)
+	return ClusterInventoryView{Namespaces: snapshot.Namespaces, Workloads: snapshot.Workloads, Services: snapshot.Services}, nil
+}
+
+func (o Orchestrator) Dashboard(ctx context.Context) (OverviewView, ApplicationsView, ClusterInventoryView, error) {
+	snapshot, err := o.provider.Snapshot(ctx)
 	if err != nil {
-		return ClusterInventoryView{}, err
+		return OverviewView{}, ApplicationsView{}, ClusterInventoryView{}, err
 	}
-	services, err := o.provider.Services(ctx)
-	if err != nil {
-		return ClusterInventoryView{}, err
+	overview := OverviewView{Summary: snapshot.Summary, ProblematicWorkloads: problematicWorkloads(snapshot.Workloads)}
+	apps := ApplicationsView{Applications: snapshot.Apps}
+	cluster := ClusterInventoryView{Namespaces: snapshot.Namespaces, Workloads: snapshot.Workloads, Services: snapshot.Services}
+	return overview, apps, cluster, nil
+}
+
+func problematicWorkloads(workloads []domain.Workload) []domain.Workload {
+	problematic := make([]domain.Workload, 0)
+	for _, workload := range workloads {
+		if workload.Health == domain.HealthWarning || workload.Health == domain.HealthCritical {
+			problematic = append(problematic, workload)
+		}
+		if len(problematic) == 5 {
+			break
+		}
 	}
-	return ClusterInventoryView{Namespaces: namespaces, Workloads: workloads, Services: services}, nil
+	return problematic
 }
 
 func filterWorkloads(all []domain.Workload, refs []domain.WorkloadRef) []domain.Workload {
