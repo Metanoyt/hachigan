@@ -2,9 +2,9 @@
 
 Hachigan is a Go + Bubble Tea terminal application that acts as a local Kubernetes platform console.
 
-P1 is a foundation release. It opens a TUI against the current kubeconfig context, derives basic applications from Kubernetes objects, and lets you browse cluster overview, applications, application details, and cluster inventory.
+Currently the project is a foundation release. It opens a TUI against the current kubeconfig context, derives basic applications from Kubernetes objects, and lets you browse cluster overview, applications, application details, and cluster inventory.
 
-## What P1 Implements
+## What it Implements
 
 - Layered architecture across TUI, domain, orchestrator, config, and providers
 - Bubble Tea TUI shell with overview, applications, application detail, and cluster screens
